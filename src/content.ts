@@ -1,7 +1,7 @@
 import { BilibiliService } from './services/bilibili';
 import { AIService } from './services/ai';
 import { WhitelistService } from './services/whitelist';
-import { AudioService } from './services/audio';
+import { BcutService } from './services/bcut';
 import { CacheService } from './services/cache';
 import { normalizeErrorForUser } from './utils/errors';
 
@@ -340,60 +340,26 @@ class AdDetector {
 
         console.log('【VideoAdGuard】官方字幕数据已加载:', {captions});
       } else {
-        // 无官方字幕 - 尝试使用音频识别
-        const audioSettings = await chrome.storage.local.get(['enableAudioTranscription']);
-        if (audioSettings.enableAudioTranscription) {
-          console.log('【VideoAdGuard】无官方字幕，尝试音频识别');
-          try {
-            // 使用完整的音频处理和识别流程
-            const playUrlInfo = await BilibiliService.getPlayUrl(bvid, videoInfo.cid);
-            const result = await AudioService.processAndTranscribeAudio(playUrlInfo, {
-              responseFormat: 'verbose_json'
-            });
+        // 无官方字幕 - 使用必剪 BCut ASR 识别
+        console.log('【VideoAdGuard】无官方字幕，尝试 BCut ASR 识别');
+        try {
+          const playUrlInfo = await BilibiliService.getPlayUrl(bvid, videoInfo.cid);
+          const audioUrl = BcutService.getAudioUrl(playUrlInfo);
+          if (!audioUrl) throw new Error('无法获取音频地址');
 
-            if (result) {
-              console.log('【VideoAdGuard】音频识别完成:', result.transcription.text);
+          const result = await BcutService.transcribe(audioUrl);
 
-              // 将语音识别结果转换为统一的字幕格式
-              if (result.transcription.segments && Array.isArray(result.transcription.segments)) {
-                const uniqueSegments = result.transcription.segments.filter((segment: any, index: number) => {
-                  if (!segment.text || !segment.text.trim()) return false;
-                  // 检查是否与之前的分段有重复的文本内容
-                  const currentText = segment.text.trim();
-                  return !result.transcription.segments.slice(0, index).some((prevSegment: any) => 
-                    prevSegment.text && prevSegment.text.trim() === currentText
-                  );
-                });
+          result.body.forEach((item, index) => {
+            if (item.content) captions[index] = item.content;
+          });
+          captionsData = result;
 
-                // 使用分段信息创建字幕数据，包含准确的时间信息
-                uniqueSegments.forEach((segment: any, index: number) => {
-                  if (segment.text && segment.text.trim()) {
-                    captions[index] = segment.text.trim();
-                  }
-                });
-
-                // 为音频识别创建准确的captionsData结构，使用Whisper提供的时间信息
-                captionsData = {
-                  body: uniqueSegments.map((segment: any) => ({
-                    content: segment.text?.trim() || '',
-                    from: segment.start || 0, // 使用Whisper提供的开始时间
-                    to: segment.end || 0,     // 使用Whisper提供的结束时间
-                    location: 2
-                  })).filter((item: any) => item.content) // 过滤掉空内容
-                };
-              } 
-              console.log('【VideoAdGuard】音频字幕数据已生成', {captions});
-            } else {
-              console.log('【VideoAdGuard】音频处理和识别失败');
-            }
-          } catch (error) {
-            console.log('【VideoAdGuard】音频识别失败:', error);
-            this.adDetectionResult =
-              (this.adDetectionResult ? this.adDetectionResult + ' | ' : '') +
-              normalizeErrorForUser(error, 'audio');
-          }
-        } else {
-          console.log('【VideoAdGuard】音频识别功能未启用');
+          console.log('【VideoAdGuard】BCut ASR 字幕数据已生成', {captions});
+        } catch (error) {
+          console.log('【VideoAdGuard】BCut ASR 识别失败:', error);
+          this.adDetectionResult =
+            (this.adDetectionResult ? this.adDetectionResult + ' | ' : '') +
+            normalizeErrorForUser(error, 'audio');
         }
 
         // 如果最终没有获取到任何字幕数据

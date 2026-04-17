@@ -82,10 +82,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const autoSkipAdCheckbox = document.getElementById('autoSkipAd') as HTMLInputElement;
   const restrictedModeCheckbox = document.getElementById('restrictedMode') as HTMLInputElement;
   const togglePasswordBtn = document.getElementById('toggleApiKey') as HTMLInputElement;
-  const groqApiKeyInput = document.getElementById('groqApiKey') as HTMLInputElement;
-  const toggleGroqPasswordBtn = document.getElementById('toggleGroqApiKey') as HTMLInputElement;
-  const enableAudioTranscriptionCheckbox = document.getElementById('enableAudioTranscription') as HTMLInputElement;
-  const enableGroqProxyCheckbox = document.getElementById('enableGroqProxy') as HTMLInputElement;
 
   const providerDropdown = document.getElementById('providerDropdown') as HTMLButtonElement;
   const providerDropdownMenu = document.getElementById('providerDropdownMenu') as HTMLDivElement;
@@ -229,9 +225,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const enableLocalOllama = provider === 'custom_fetch';
     const autoSkipAd = autoSkipAdCheckbox.checked;
     const restrictedMode = restrictedModeCheckbox.checked;
-    const groqApiKey = groqApiKeyInput.value.trim();
-    const enableAudioTranscription = enableAudioTranscriptionCheckbox.checked;
-    const enableGroqProxy = enableAudioTranscription && enableGroqProxyCheckbox ? enableGroqProxyCheckbox.checked : false;
 
     if (!baseUrl) console.warn('基础地址为空');
     if (provider !== 'custom_fetch' && !apiKey) console.warn('API密钥为空');
@@ -252,9 +245,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         enableLocalOllama,
         autoSkipAd,
         restrictedMode,
-        groqApiKey,
-        enableAudioTranscription,
-        enableGroqProxy,
       };
 
       if (provider === 'custom_fetch') {
@@ -275,8 +265,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     enableExtensionCheckbox,
     autoSkipAdCheckbox,
     restrictedModeCheckbox,
-    enableAudioTranscriptionCheckbox,
-    enableGroqProxyCheckbox,
   ].filter(Boolean);
 
   allCheckboxes.forEach((checkbox) => {
@@ -285,7 +273,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  const allTextInputs = [apiKeyInput, modelInput, groqApiKeyInput].filter(Boolean);
+  const allTextInputs = [apiKeyInput, modelInput].filter(Boolean);
   allTextInputs.forEach((input) => {
     let debounceTimer: number | null = null;
     input.addEventListener('input', () => {
@@ -415,24 +403,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  if (toggleGroqPasswordBtn && groqApiKeyInput) {
-    toggleGroqPasswordBtn.addEventListener('click', () => {
-      const type = groqApiKeyInput.getAttribute('type') === 'password' ? 'text' : 'password';
-      groqApiKeyInput.setAttribute('type', type);
-    });
-  }
-
-  function updateAudioTranscriptionState(enabled: boolean) {
-    document.body.classList.toggle('audio-transcription-enabled', enabled);
-    if (!enabled && enableGroqProxyCheckbox) {
-      enableGroqProxyCheckbox.checked = false;
-    }
-  }
-
-  enableAudioTranscriptionCheckbox.addEventListener('change', () => {
-    updateAudioTranscriptionState(enableAudioTranscriptionCheckbox.checked);
-  });
-
   const settings = await chrome.storage.local.get([
     'provider',
     'baseUrl',
@@ -447,9 +417,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     'autoSkipAd',
     'restrictedMode',
     DEBUG_MODE_STORAGE_KEY,
-    'groqApiKey',
-    'enableAudioTranscription',
-    'enableGroqProxy',
   ]);
 
   const storedBaseUrlsByProvider = settings.baseUrlsByProvider as Partial<Record<LLMProvider, unknown>> | undefined;
@@ -506,16 +473,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (typeof settings.autoSkipAd === 'boolean') autoSkipAdCheckbox.checked = settings.autoSkipAd;
   if (settings.restrictedMode) restrictedModeCheckbox.checked = settings.restrictedMode;
   debugModeEnabled = settings[DEBUG_MODE_STORAGE_KEY] === true;
-  if (settings.groqApiKey) groqApiKeyInput.value = settings.groqApiKey;
-  if (typeof settings.enableAudioTranscription === 'boolean') {
-    enableAudioTranscriptionCheckbox.checked = settings.enableAudioTranscription;
-  }
-  updateAudioTranscriptionState(enableAudioTranscriptionCheckbox.checked);
-  if (enableGroqProxyCheckbox) {
-    enableGroqProxyCheckbox.checked = enableAudioTranscriptionCheckbox.checked
-      ? Boolean(settings.enableGroqProxy)
-      : false;
-  }
 
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const currentTab = tabs[0];
