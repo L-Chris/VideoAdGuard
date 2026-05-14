@@ -27,15 +27,19 @@ export interface BcutCaption {
 
 export class BcutService {
   /**
-   * 从播放信息中提取带宽最低的音频 CDN URL（m4s 格式）
+   * 从播放信息中提取音频 CDN URL（m4s 格式）
+   * 策略与 bilibili-mcp 同步：选最后一个（最高音质），优先 mcdn.bilivideo.cn
    */
   public static getAudioUrl(playUrlData: any): string | null {
     try {
       if (!playUrlData?.dash?.audio || !Array.isArray(playUrlData.dash.audio)) return null;
       const streams: any[] = playUrlData.dash.audio;
-      let min = streams[0];
-      for (const s of streams) if (s.bandwidth < min.bandwidth) min = s;
-      return min.baseUrl as string;
+      const audio = streams[streams.length - 1];
+      const allUrls: string[] = [audio.baseUrl, ...(audio.backupUrl || [])];
+      for (const u of allUrls) {
+        if (u.includes('.mcdn.bilivideo.cn')) return u;
+      }
+      return audio.baseUrl as string;
     } catch {
       return null;
     }
