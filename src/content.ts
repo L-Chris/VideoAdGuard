@@ -327,10 +327,14 @@ class AdDetector {
       let captionsData: any = null;
 
       // 判断是否有官方字幕
-      if (playerInfo.subtitle?.subtitles?.length) {
+      const officialSubtitle = BilibiliService.selectBestSubtitle(playerInfo.subtitle?.subtitles || []);
+      if (officialSubtitle?.subtitle_url) {
         // 有官方字幕 - 使用官方字幕
-        console.log('【VideoAdGuard】使用官方字幕进行检测');
-        const captionsUrl = 'https:' + playerInfo.subtitle.subtitles[0].subtitle_url;
+        console.log('【VideoAdGuard】使用官方字幕进行检测:', {
+          lan: officialSubtitle.lan,
+          lan_doc: officialSubtitle.lan_doc,
+        });
+        const captionsUrl = BilibiliService.normalizeSubtitleUrl(officialSubtitle.subtitle_url);
         captionsData = await BilibiliService.getCaptions(captionsUrl);
 
         // 将官方字幕转换为统一格式

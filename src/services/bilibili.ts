@@ -1,5 +1,13 @@
 import { WbiUtils } from '../utils/wbi';
 
+export interface BilibiliSubtitle {
+  id?: number;
+  lan?: string;
+  lan_doc?: string;
+  subtitle_url?: string;
+  [key: string]: any;
+}
+
 export class BilibiliService {
   private static async fetchWithCookie(url: string, params: Record<string, any> = {}) {
     const queryString = new URLSearchParams(params).toString();
@@ -78,6 +86,40 @@ export class BilibiliService {
     const data = await response.json();
     console.log('【VideoAdGuard】[BilibiliService] Captions result:', data);
     return data;
+  }
+
+  public static selectBestSubtitle(subtitles: BilibiliSubtitle[] = []): BilibiliSubtitle | null {
+    if (!Array.isArray(subtitles) || subtitles.length === 0) {
+      return null;
+    }
+
+    const languagePriority = ['ai-zh', 'zh-CN', 'zh-Hans', 'zh', 'zh-TW', 'zh-Hant'];
+    for (const language of languagePriority) {
+      const subtitle = subtitles.find((item) => item?.lan === language && item.subtitle_url);
+      if (subtitle) {
+        return subtitle;
+      }
+    }
+
+    const chineseSubtitle = subtitles.find((item) => {
+      const text = `${item?.lan || ''} ${item?.lan_doc || ''}`.toLowerCase();
+      return Boolean(item?.subtitle_url) && (text.includes('zh') || text.includes('中文') || text.includes('简体') || text.includes('繁体'));
+    });
+    if (chineseSubtitle) {
+      return chineseSubtitle;
+    }
+
+    return subtitles.find((item) => Boolean(item?.subtitle_url)) || null;
+  }
+
+  public static normalizeSubtitleUrl(url: string): string {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    if (url.startsWith('//')) {
+      return `https:${url}`;
+    }
+    return url;
   }
 
   /**
