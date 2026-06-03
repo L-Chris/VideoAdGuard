@@ -176,7 +176,8 @@ export class BcutService {
       const start = index * resource.per_size;
       const end = Math.min(start + resource.per_size, blob.size);
       const part = blob.slice(start, end);
-      const resp = await fetch(resource.upload_urls[index], {
+      const uploadUrl = BcutService.normalizeUploadUrl(resource.upload_urls[index]);
+      const resp = await fetch(uploadUrl, {
         method: 'PUT',
         body: part,
       });
@@ -184,6 +185,13 @@ export class BcutService {
       etags.push(resp.headers.get('Etag') || resp.headers.get('ETag') || '');
     }
     return etags;
+  }
+
+  private static normalizeUploadUrl(url: string): string {
+    if (url.startsWith('http://')) {
+      return `https://${url.slice('http://'.length)}`;
+    }
+    return url;
   }
 
   private static async commitUpload(resource: BcutResourceCreateData, etags: string[]): Promise<string> {
